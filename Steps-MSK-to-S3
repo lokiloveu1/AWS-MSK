@@ -1,0 +1,91 @@
+#reference - https://docs.confluent.io/kafka-connect-s3-sink/current/configuration_options.html
+
+========================================
+
+1. Create a S3 bucket that will be the delivery target.
+
+2. Create an EC2 instance for running the Kafka connector. Note - I am using an Ubuntu instance as a MSK client and I have tested that it has access to my MSK cluster. 
+
+3. Install Java 
+	$ sudo apt-get update
+	$ sudo apt-get install default-jre
+
+4.Installing the Confluent Platform 
+curl http://packages.confluent.io/archive/5.1/confluent-community-5.1.0-2.11.tar.gz -o confluent-community.tar.gz
+tar -xvf confluent-community.tar.gz
+
+Note: Confluent version 5.1.0 already comes with the plugin for the s3 connector . For other versions that does not have the plugin included, we may need to install the connector with the confluent hub using the following additional steps
+
+Install the confluent hub :
+curl http://client.hub.confluent.io/confluent-hub-client-latest.tar.gz -o confluent-hub-client-latest.tar.gz
+tar -xvf confluent-hub-client-latest.tar.gz
+
+export PATH=~/confluent-5.1.0/bin:${PATH};
+
+cd ~/confluent-5.1.0/share/java
+
+confluent-hub install confluentinc/kafka-connect-s3:5.3.1      #I am using kafka-connect-s3 here instead of kafka-connect-kinesis
+
+5. Locate kafka.client.truststore.jks
+
+$cp /usr/lib/jvm/java-11-openjdk-amd64/lib/security/cacerts /tmp/kafka.client.truststore.jks
+
+6. Configuration Files
+
+a. I edited the file '/etc/kafka/connect-standalone.properties' with the following configs:
+    $cd ~/confluent-5.1.0
+    $sudo vi /etc/kafka/connect-standalone.properties
+
+---
+bootstrap.servers=<your_bootstrap> 
+plugin.path=share/java,.,/home/ubuntu/confluent-5.1.0/share/confluent-hub-components  #your plugin path
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
+key.converter.schemas.enable=false
+value.converter.schemas.enable=false
+internal.key.converter=org.apache.kafka.connect.json.JsonConverter
+internal.value.converter=org.apache.kafka.connect.json.JsonConverter
+internal.key.converter.schemas.enable=false
+internal.value.converter.schemas.enable=false
+offset.storage.file.filename=/tmp/connect.offsets
+offset.flush.interval.ms=10000
+
+#Kafka Connect properties
+ssl.enabled.protocols=TLSv1.2,TLSv1.1,TLSv1
+security.protocol=SSL
+ssl.truststore.location=/tmp/kafka.client.truststore.jks
+
+#Sink connector properties
+consumer.ssl.enabled.protocols=TLSv1.2,TLSv1.1,TLSv1
+consumer.ssl.truststore.location = /tmp/kafka.client.truststore.jks
+consumer.ssl.protocol=SSL
+consumer.security.protocol=SSL
+---
+
+b. The "/etc/kafka/connect-file-sink.properties" file will be like this:
+
+---
+name=s3-sink
+connector.class=io.confluent.connect.s3.S3SinkConnector
+tasks.max=1
+topics=<demoTopic>
+s3.region=<us-east-1>
+s3.bucket.name=<your_s3_bucket>
+s3.part.size=5242880
+flush.size=1
+storage.class=io.confluent.connect.s3.storage.S3Storage
+format.class=io.confluent.connect.s3.format.json.JsonFormat
+schema.generator.class=io.confluent.connect.storage.hive.schema.DefaultSchemaGenerator
+partitioner.class=io.confluent.connect.storage.partitioner.DefaultPartitioner
+schema.compatibility=NONE
+---
+
+7. Run the kafka-connector for s3
+
+Cd into "~/confluent-5.1.0/" Use the following command to start the connector:
+
+$bin/connect-standalone  /etc/kafka/connect-standalone.properties /etc/kafka/connect-file-sink.properties
+
+Once the connector starts all the data in the topic will be sent to the S3 bucket.
+
+========================================
