@@ -42,11 +42,11 @@ I have also Enabled Cross-Zone Load Balancing feature here.
 5.Enable the NLB for the same AZ and subnet as the MSK broker it fronts(in VPC A).
 
 6.Create an endpoint service configuration for each NLB that requires acceptance and grant permissions to the client account so it can create a connection to this endpoint service. 
-You can find the "Service name" after you created this endpoint service, this should be like: "com.amazonaws.vpce.us-east-1.vpce-svc-0e123abc123198abc"
+You can find the "Service name" after you created this endpoint service, this should be like: "com.amazonaws.vpce.us-east-1.vpce-svc-xxxxxxxxxx"
 
 7.Create an interface endpoint in VPC B wihch the client is in(different VPC). For Service category, choose Find service by name. For Service Name, enter the name of the service (for example, com.amazonaws.vpce.us-east-1.vpce-svc-0e123abc123198abc) and choose Verify.
 
-8.Create a Route 53 private hosted zone, with the domain name kafka.us-east-1.amazonaws.com(in your case, use "kafka.ap-east-1.amazonaws.com" instead), and associate it with the VPC B.
+8.Create a Route 53 private hosted zone, with the domain name kafka.us-east-1.amazonaws.com, and associate it with the VPC B.
 
 9.Create A-Alias records identical to the broker DNS names to avoid any TLS handshake failures and point it to the interface endpoints of the respective brokers.
 
